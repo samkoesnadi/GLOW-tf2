@@ -65,8 +65,17 @@ def div_s(x, a, max_val=1e9):
     """div to scalar"""
     return tf.minimum(tf.maximum(x/a, -max_val), max_val)
 
+def elu(x):
+    return tf.where(x < 0, tf.exp(x)-1, x)
+
 def inv_elu(y):
-    return tf.where(y < 0, tf.math.log(y+1+TF_EPS), y)
+    return tf.where(y < 0, tf.math.log(y+1), y)
+
+def leakyrelu(z, alpha=0.2):
+    return tf.maximum(alpha * z, z)
+
+def inv_leakyrelu(y, alpha=0.2):
+    return tf.where(y < 0, y / alpha, y)
 
 def d_elu(x):
     """
@@ -79,24 +88,27 @@ def d_elu(x):
 def log_abs(x):
     return tf.math.log(tf.math.abs(x))
 
+def my_tf_round(x, decimals = 0):
+    multiplier = tf.constant(10**decimals, dtype=x.dtype)
+    return tf.round(x * multiplier) / multiplier
+
 def logpz(mean, var, x):
     """
 
-    :param mean: (n)
-    :param var: (n)
+    :param mean: (bsxn)
+    :param var: (bsxn)
     :param x: (bsxn)
     :return: ()
     """
-    # return -0.5 * tf.math.log(2 * np.pi) + 2. * logsd + (x - mean) ** 2 / tf.exp(2. * logsd)
-    # return -0.5 * (tf.math.log(2 * np.pi) - logsd) - .5 * ((x - mean) / tf.exp(logsd)) ** 2
-    var_matrix = tf.linalg.diag(var)
-    k = mean.shape[0]
-    mean = mean[None, :]  # because there is no dimensionalty in the mean
-    # tf.print(-.5*(x-mean)@var_matrix@tf.transpose(x-mean))
-    logpz = -.5*tf.linalg.diag_part((x-mean)@var_matrix@tf.transpose(x-mean))\
-            -(.5*(k*tf.math.log(2*np.pi)+tf.linalg.logdet(var_matrix)))
-    # print(logpz)
-    return tf.reduce_sum(logpz)
+    return tf.reduce_sum(-0.5 * (tf.math.log(2 * np.pi) - tf.math.log(var**.5)) - .5 * ((x - mean) / var**.5) ** 2)
+    # var_matrix = tf.linalg.diag(var)
+    # k = mean.shape[0]
+    # mean = mean[None, :]  # because there is no dimensionalty in the mean
+    # # tf.print(-.5*(x-mean)@var_matrix@tf.transpose(x-mean))
+    # logpz = -.5*tf.linalg.diag_part((x-mean)@tf.linalg.inv(var_matrix)@tf.transpose(x-mean))\
+    #         -(.5*(k*tf.math.log(2*np.pi)+tf.linalg.logdet(var_matrix)))
+    # # print(logpz)
+    # return tf.reduce_sum(logpz)
 
 def pz(mean, var, x):
     var_matrix = tf.linalg.diag(var)
@@ -111,7 +123,7 @@ def relu1(x):
     return tf.math.minimum(x, 1)
 
 def inv_sigmoid(x):
-    return - tf.math.log(1/x-1)
+    return - tf.math.log((1-x)/x)
 
 def dev_sigmoid(x):
     """derivative of sigmoid"""
@@ -139,11 +151,27 @@ class Tensorboard:
             tf.summary.scalar('critic loss', Q_loss.result(), step=epoch)
             tf.summary.scalar('actor loss', A_loss.result(), step=epoch)
 
+@tf.keras.utils.register_keras_serializable(package='Custom', name='det_1_reg')
+def det_1_reg(weight_matrix):
+    """
+    for 1x1 CNN, so that it remains orthogonal and same volume (det**2==1)
+    :param weight_matrix:
+    :return:
+    """
+    return (tf.math.abs(tf.linalg.det(weight_matrix)) - 1)**2
+
+def s_activation(x, alpha=1):
+        return tf.minimum(x, alpha)
 
 if __name__ == "__main__":
     mean = np.zeros((10,), dtype=np.float32)
     var = np.ones((10,), dtype=np.float32)
-    x = np.random.normal(0, 1, (400,10)).astype(np.float32)
-    print(tf.exp(logpz(mean, var, x)))
-    print(pz(mean, var, x))
-    print(logpz(mean, var, x))
+
+    print(inv_sigmoid(0))
+    print(inv_sigmoid(1-TF_EPS))
+    print(inv_sigmoid(0.5))
+
+    # x = np.random.normal(0, 1, (400,10)).astype(np.float32)
+    # print(tf.exp(logpz(mean, var, x)))
+    # print(pz(mean, var, x))
+    # print(logpz(mean, var, x))

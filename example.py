@@ -1,20 +1,20 @@
 import tensorflow as tf
-import tensorflow_probability as tfp
+from utils.utils import *
 
-x = tf.random.normal((512,512), dtype=tf.float32)
-m = tf.random.normal((512,512), dtype=tf.float32)
 
-mult = 1
+x = tf.random.normal((512,512), 0, 1, dtype=tf.float32)
+y = tf.random.normal((512,512), 0, 1, dtype=tf.float32)
 
-x *= mult
-m *= 1
+mean = tf.zeros((512,))
+var = tf.ones((512,))
 
-y = m * x
-x_o = (y) / (m)
+print(logpz(mean, var, x))
+print(logpz(mean, var, y))
 
-# tf.assert_equal(x, x_o)
-
-print(x, x_o)
-
-print(1/512 * (1/512))
-print(1/(512*512))
+# a = np.array([[1,0,0,0],
+#               [0,0,1,0],
+#               [0,0,0,1],
+#               [0,1,0,0]])
+#
+# print(np.linalg.det(a))
+# print(np.linalg.inv(a))

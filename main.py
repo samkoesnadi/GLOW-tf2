@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Step 1. the data, split between train and test sets
-    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar100.load_data()
 
     x_train = x_train.reshape(x_train.shape[0], IMG_SIZE, IMG_SIZE, CHANNEL_SIZE)
     x_test = x_test.reshape(x_test.shape[0], IMG_SIZE, IMG_SIZE, CHANNEL_SIZE)
@@ -15,71 +15,101 @@ if __name__ == "__main__":
     x_train /= 255
     x_test /= 255
 
-    # convert class vectors to binary class matrices
-    y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
-    y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
+    datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+        rotation_range=20,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        horizontal_flip=True,
+        brightness_range=(-0.2,0.2),
+        shear_range=0.2)
+
+    # # convert class vectors to binary class matrices
+    # y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
+    # y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
+
+    # # filter to train
+    # x_train = x_train[y_train==3]
+    # y_train = y_train[y_train==3]
+    # x_test = x_test[y_test==3]
+    # y_test = y_test[y_test==3]
+
+    def augment(x,y):
+        return (tf.reshape(tf.numpy_function(datagen.random_transform, inp=[x], Tout=tf.float32), (IMG_SIZE,IMG_SIZE,CHANNEL_SIZE)), y)
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))\
         .shuffle(SHUFFLE_SIZE)\
-        .map(augment_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)\
+        .map(augment, num_parallel_calls=tf.data.experimental.AUTOTUNE)\
         .batch(BATCH_SIZE)\
         .prefetch(tf.data.experimental.AUTOTUNE)
 
     # Step 2. the brain
     brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, LEARNING_RATE)
 
+    # load weight if available
+    print(brain.load_weights(CHECKPOINT_PATH))
+
     # Step 3. training iteration
 
     # define metrics variables
     nll = tf.keras.metrics.Mean("nll")
-    test_img = x_train[0][None,:]
-    test_img_2 = x_train[1][None,:]
+    mean_z_squared = tf.keras.metrics.Mean("mean_z_squared")
+    var_z = tf.keras.metrics.Mean("var_z")
+    test_img = x_test[0][None,:]
+    test_img_2 = x_test[1][None,:]
     test_z = np.random.normal(0, 1, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE))
-    plt.imsave("test_ref.png", np.squeeze(test_img))
-    plt.imsave("test_ref2.png", np.squeeze(test_img_2))
+    plt.imsave("./results/test_ref.png", np.squeeze(test_img))
+    plt.imsave("./results/test_ref2.png", np.squeeze(test_img_2))
+
+    # TENSORBOARD
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_log_dir = TENSORBOARD_LOGDIR + current_time + '/train'
+    train_summary_writer = tf.summary.create_file_writer(train_log_dir)
 
     for ep in range(EPOCHS):
         print(f"epoch {ep+1}/{EPOCHS}")
         nll.reset_states()
+        mean_z_squared.reset_states()
+        var_z.reset_states()
 
         # iteration per epoch
         with tqdm(train_dataset) as t:
             for x_t, y_t in t:
-                nll(brain.train_step(x_t))  # run the train step and store the nll in the variable
-                t.set_postfix(nll=nll.result().numpy())
+                z, _nll_x = brain.train_step(x_t)  # run the train step and store the nll in the variable
+                mean_z_squared(tf.reduce_mean(z, axis=-1)**2)
+                var_z(tf.math.reduce_variance(z, axis=-1))
+                nll(_nll_x)
+                t.set_postfix(nll=nll.result().numpy(), mean_sq=mean_z_squared.result().numpy(), var=var_z.result().numpy())
 
         # save weight every epoch
-        brain.model.save_weights("test.hdf5")
+        brain.save_weights(CHECKPOINT_PATH)
+
+        # TENSORBOARD Save
+        with train_summary_writer.as_default():
+            tf.summary.scalar('nll', nll.result(), step=ep)
+            tf.summary.scalar('mean_sq', mean_z_squared.result(), step=ep)
+            tf.summary.scalar('var', var_z.result(), step=ep)
+            tf.summary.image("inverted", tf.clip_by_value(brain.model(
+                    brain.model(test_img)[0],
+                    reverse=True)[0], 0, 1),
+                             step=ep)
+            tf.summary.image("from_random_07", tf.clip_by_value(brain.model(
+                    np.random.normal(0, 0.7, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
+                    reverse=True)[0], 0, 1),
+                             step=ep)
 
         # store image for evaluation
-        plt.imsave("test.png", np.minimum(np.maximum(
-            np.squeeze(
-                brain.model(
+        plt.imsave("./results/test.png", tf.clip_by_value(brain.model(
                     (brain.model(test_img)[0]+brain.model(test_img_2)[0])/2,
-                    reverse=True)[0].numpy()
-            ), 0), 1))
-        plt.imsave("test2.png", np.minimum(np.maximum(
-            np.squeeze(
-                brain.model(
-                    (brain.model(test_img)[0]+3*brain.model(test_img_2)[0])/4,
-                    reverse=True)[0].numpy()
-            ), 0), 1))
-        plt.imsave("test3.png", np.minimum(np.maximum(
-            np.squeeze(
-                brain.model(
-                    # brain.model(test_img, resample=True)[0],
+                    reverse=True)[0][0], 0, 1).numpy())
+        plt.imsave("./results/test2.png", tf.clip_by_value(brain.model(
                     test_z,
-                    reverse=True)[0].numpy()
-            ), 0), 1))
-        plt.imsave("test4.png", np.minimum(np.maximum(
-            np.squeeze(
-                brain.model(
-                    brain.model(test_img)[0]+test_z,
-                    reverse=True)[0].numpy()
-            ), 0), 1))
-        plt.imsave("test5.png", np.minimum(np.maximum(
-            np.squeeze(
-                brain.model(
-                    brain.model(test_img)[0],
-                    reverse=True)[0].numpy()
-            ), 0), 1))
+                    reverse=True)[0][0], 0, 1).numpy())
+        plt.imsave("./results/test3.png", tf.clip_by_value(brain.model(
+                    (brain.model(test_img)[0]),
+                    reverse=True)[0][0], 0, 1).numpy())
+        plt.imsave("./results/test4.png", tf.clip_by_value(brain.model(
+                    np.random.normal(0, 0.5, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
+                    reverse=True)[0][0], 0, 1).numpy())
+        plt.imsave("./results/test5.png", tf.clip_by_value(brain.model(
+                    np.random.normal(0, 0.2, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
+                    reverse=True)[0][0], 0, 1).numpy())
