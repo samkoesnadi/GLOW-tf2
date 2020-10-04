@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Step 1. the data, split between train and test sets
-    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar100.load_data()
+    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
     x_train = x_train.reshape(x_train.shape[0], IMG_SIZE, IMG_SIZE, CHANNEL_SIZE)
     x_test = x_test.reshape(x_test.shape[0], IMG_SIZE, IMG_SIZE, CHANNEL_SIZE)
@@ -19,19 +19,19 @@ if __name__ == "__main__":
         rotation_range=20,
         width_shift_range=0.2,
         height_shift_range=0.2,
-        horizontal_flip=True,
         brightness_range=(-0.2,0.2),
         shear_range=0.2)
 
     # # convert class vectors to binary class matrices
+    # NUM_CLASSES = 10
     # y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
     # y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
 
-    # # filter to train
-    # x_train = x_train[y_train==3]
-    # y_train = y_train[y_train==3]
-    # x_test = x_test[y_test==3]
-    # y_test = y_test[y_test==3]
+    # filter to train
+    x_train = x_train[y_train==3]
+    y_train = y_train[y_train==3]
+    x_test = x_test[y_test==3]
+    y_test = y_test[y_test==3]
 
     def augment(x,y):
         return (tf.reshape(tf.numpy_function(datagen.random_transform, inp=[x], Tout=tf.float32), (IMG_SIZE,IMG_SIZE,CHANNEL_SIZE)), y)

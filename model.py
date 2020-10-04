@@ -23,21 +23,14 @@ class InvConv1(tf.keras.layers.Layer):
         else:
             x = tf.einsum("ml,ijkl->ijkm", W, inputs)
 
-        # print(tf.linalg.det(W))
         if logdet:
             return x, inputs.shape[1] * inputs.shape[2] * tf.math.log(tf.math.abs(tf.linalg.det(W)))
         else:
             return x, None
 
-        # x = inputs[:,:,:,::-1]
-        # if logdet:
-        #     return x, 0
-        # else:
-        #     return x, None
-
 
 class BatchNormalization(tf.keras.layers.Layer):
-    def __init__(self, channel_size):
+    def __init__(self):
         super().__init__()
 
         # !!! Do not change the order of the add weight
@@ -46,7 +39,7 @@ class BatchNormalization(tf.keras.layers.Layer):
         # # temp var
         # self._first = True
 
-    def call(self, inputs, logdet=False, reverse=False):
+    def call(self, inputs, logdet=False, reverse=False, training=False):
         if reverse:
             beta = self.bn.beta
             gamma = self.bn.gamma
@@ -55,19 +48,9 @@ class BatchNormalization(tf.keras.layers.Layer):
             epsilon = self.bn.epsilon
 
             x = (inputs - beta) / gamma
-            # x = inputs
-
-            # TODO: check this below
             x = x * tf.math.sqrt(variance + epsilon) + mean
         else:
-            x = self.bn(inputs)
-
-            # if self._first:
-            #     self.bn.moving_mean = tf.reduce_mean(inputs, axis=[0,1,2])
-            #     self.bn.moving_variance = tf.math.reduce_variance(inputs, axis=[0,1,2])
-            #     x = self.bn(inputs)
-            #     self._first = False
-
+            x = self.bn(inputs, training=training)
 
         if logdet:
             variance = self.bn.moving_variance
@@ -95,6 +78,10 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         self.nn1 = self.nnLayer(channel_size)
         self.nn2 = self.nnLayer(channel_size)
 
+        # self.W = self.add_weight("W", shape=(1, 1, 1, channel_size,),
+        #                          initializer=KERNEL_INITIALIZER,
+        #                          trainable=True)
+
     def nnLayer(self, channel_size):
         inputs = tf.keras.Input(shape=(None, None, channel_size // 2))
 
@@ -103,26 +90,26 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         x = tf.keras.layers.Conv2D(512, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
         x = tf.keras.layers.BatchNormalization()(x)
 
-        s = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        s = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
 
         return tf.keras.Model(inputs, [tf.exp(s), t])
 
     def forward_block(self, x, s, t):
         y = x * s + t
-        y = y if self.no_act else leakyrelu(y, ALPHA_LEAKY_RELU)
+        y = y if self.no_act else tf.nn.tanh(y)
         return y
 
     def backward_block(self, y, s, t):
-        x = ((y if self.no_act else inv_leakyrelu(y, ALPHA_LEAKY_RELU)) - t) / s
+        x = ((y if self.no_act else tf.math.atanh(y)) - t) / s
         return x
 
-    def call(self, inputs, logdet=False, reverse=False):
+    def call(self, inputs, logdet=False, reverse=False, training=False):
         if reverse:
             v1, v2 = split_last_channel(inputs)
-            s1, t1 = self.nn1(v1)
+            s1, t1 = self.nn1(v1, training=training)
             u2 = self.backward_block(v2, s1, t1)
-            s2, t2 = self.nn2(u2)
+            s2, t2 = self.nn2(u2, training=training)
             u1 = self.backward_block(v1, s2, t2)
 
             # change convention for variable purpose
@@ -131,14 +118,14 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
             # print(v1[0, 0, 0, 0], v2[0, 0, 0, 0])
         else:
             u1, u2 = split_last_channel(inputs)
-            s2, t2 = self.nn2(u2)
+            s2, t2 = self.nn2(u2, training=training)
             v1 = self.forward_block(u1, s2, t2)
-            s1, t1 = self.nn1(v1)
+            s1, t1 = self.nn1(v1, training=training)
             v2 = self.forward_block(u2, s1, t1)
             # print(u1[0,0,0,0], u2[0,0,0,0])
 
         if logdet:
-            _logabsdet = tf.reduce_mean(log_abs(s1), 0) + tf.reduce_mean(log_abs(s2), 0)
+            _logabsdet = tf.reduce_mean(log_abs(s1) + log_abs(s2), 0)
             return (v1, v2), tf.reduce_sum(_logabsdet)
         else:
             return (v1, v2), None
@@ -147,30 +134,30 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 class FlowStep(tf.keras.layers.Layer):
     def __init__(self, channel_size, no_act=False):
         super().__init__()
-        self.bn = BatchNormalization(channel_size)
+        self.bn = BatchNormalization()
         self.perm = InvConv1(channel_size)
         self.acl = AffineCouplingLayer(channel_size, no_act)
 
-    def call(self, inputs, logdet=False, reverse=False):
+    def call(self, inputs, logdet=False, reverse=False, training=False):
         if not reverse:
             # act norm
-            x, logdet_an = self.bn(inputs, logdet, reverse)
+            x, logdet_an = self.bn(inputs, logdet, reverse, training)
 
             # invertible 1x1 layer
             x, logdet_perm = self.perm(x, logdet, reverse)
 
             # affine coupling layer
-            x, logdet_acl = self.acl(x, logdet, reverse)
+            x, logdet_acl = self.acl(x, logdet, reverse, training)
         else:
             # affine coupling layer
-            x, _ = self.acl(inputs, logdet, reverse)
+            x, _ = self.acl(inputs, logdet, reverse, training)
             x = tf.concat(x, axis=-1)  # concat the two output produced
 
             # invertible 1x1 layer
             x, _ = self.perm(x, logdet, reverse)
 
             # act norm
-            x, _ = self.bn(x, logdet, reverse)
+            x, _ = self.bn(x, logdet, reverse, training)
 
         if logdet:
             # print(logdet_an, logdet_perm, logdet_acl)
@@ -239,7 +226,7 @@ class GLOW(tf.keras.Model):
         # self.debugging = {}
 
     # @tf.function
-    def call(self, inputs, logdet=False, reverse=False):
+    def call(self, inputs, logdet=False, reverse=False, training=False):
         inputs = tf.cast(inputs, dtype=tf.float32)  # cast it
 
         if not reverse:
@@ -262,12 +249,12 @@ class GLOW(tf.keras.Model):
 
                 # Step 2.2 run flow step for K times
                 for i_k in range(self.K - 1):
-                    (ya, yb), logdet_fs = self.flowsteps[i_l][i_k](x, logdet, reverse)
+                    (ya, yb), logdet_fs = self.flowsteps[i_l][i_k](x, logdet, reverse, training)
                     x = concat_last_channel(yb, ya)  # flip the ya and yb as of the architecture design
                     if logdet: logdet_fs_total += logdet_fs
 
                 # Step 2.3 run the last K without concat
-                (ya, yb), logdet_fs = self.flowsteps[i_l][self.K - 1](x, logdet, reverse)
+                (ya, yb), logdet_fs = self.flowsteps[i_l][self.K - 1](x, logdet, reverse, training)
                 if logdet: logdet_fs_total += logdet_fs
 
                 # set x to yb
@@ -287,12 +274,11 @@ class GLOW(tf.keras.Model):
                 mean_var = tf.zeros(z_total.shape)
                 mean = mean_var
                 var = mean_var + 1
-                # logpx = tf.expand_dims(flatten_sum(logpz(mean, logsd, ya)), -1) + tf.expand_dims(logdet_fs_total, 0)
                 logpzs = logpz(mean, var, z_total)
 
                 # print(logpzs, logdet_fs_total)
-
-                return z_total, logpzs / BATCH_SIZE + logdet_fs_total / (K_GLOW * L_GLOW)
+                # print(logpzs / BATCH_SIZE, logdet_fs_total)
+                return z_total, logpzs / BATCH_SIZE + logdet_fs_total
             else:
                 return z_total, None
         else:
@@ -359,6 +345,7 @@ if __name__ == "__main__":
 
     model = GLOW(SQUEEZE_FACTOR, K_GLOW, L_GLOW)
     import time
+    # model.load_weights(CHECKPOINT_PATH+".h5")
 
     # print(model(a, logdet=True, reverse=False))
     a_1 = model(model(a)[0], reverse=True)[0]
