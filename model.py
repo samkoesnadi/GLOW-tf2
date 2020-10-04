@@ -110,11 +110,11 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 
     def forward_block(self, x, s, t):
         y = x * s + t
-        y = y if self.no_act else (y)
+        y = y if self.no_act else leakyrelu(y, ALPHA_LEAKY_RELU)
         return y
 
     def backward_block(self, y, s, t):
-        x = ((y if self.no_act else (y)) - t) / s
+        x = ((y if self.no_act else inv_leakyrelu(y, ALPHA_LEAKY_RELU)) - t) / s
         return x
 
     def call(self, inputs, logdet=False, reverse=False):
@@ -292,7 +292,7 @@ class GLOW(tf.keras.Model):
 
                 # print(logpzs, logdet_fs_total)
 
-                return z_total, logpzs / BATCH_SIZE + logdet_fs_total
+                return z_total, logpzs / BATCH_SIZE + logdet_fs_total / (K_GLOW * L_GLOW)
             else:
                 return z_total, None
         else:

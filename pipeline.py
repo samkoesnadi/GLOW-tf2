@@ -8,7 +8,7 @@ class Brain:
         self.model = GLOW(factor_size, k, l)
 
         # vars for training
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate, clipvalue=1e-4)
 
     @tf.function
     def train_step(self, inputs):
@@ -20,8 +20,8 @@ class Brain:
                 # define the negative log-likelihood
                 nll = -logpx
                 nll_and_reg = nll + REGULARIZER_N * tf.add_n(self.model.losses)
-            gradient_to_inputs = (tf.norm(tape_inside.gradient(nll, inputs)) - 1) ** 2
-            nll_and_reg += LAMBDA_LIPSCHITZ * gradient_to_inputs
+            # gradient_to_inputs = (tf.norm(tape_inside.gradient(nll, inputs)) - 1) ** 2
+            # nll_and_reg += LAMBDA_LIPSCHITZ * gradient_to_inputs
 
         # print(tf.add_n(self.model.losses))
         model_gradients = tape.gradient(nll_and_reg, self.model.trainable_variables)
