@@ -36,9 +36,6 @@ class BatchNormalization(tf.keras.layers.Layer):
         # !!! Do not change the order of the add weight
         self.bn = tf.keras.layers.BatchNormalization()
 
-        # # temp var
-        # self._first = True
-
     def call(self, inputs, logdet=False, reverse=False, training=False):
         if reverse:
             beta = self.bn.beta
@@ -97,11 +94,11 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 
     def forward_block(self, x, s, t):
         y = x * s + t
-        y = y if self.no_act else tf.nn.tanh(y)
+        y = y if self.no_act else y
         return y
 
     def backward_block(self, y, s, t):
-        x = ((y if self.no_act else tf.math.atanh(y)) - t) / s
+        x = ((y if self.no_act else y) - t) / s
         return x
 
     def call(self, inputs, logdet=False, reverse=False, training=False):
