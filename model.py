@@ -16,24 +16,24 @@ class InvConv1(tf.keras.layers.Layer):
                                  trainable=True)
 
     def call(self, inputs, logdet=False, reverse=False):
-        # W = self.W
-        #
-        # if reverse:
-        #     x = tf.einsum("ml,ijkl->ijkm", tf.linalg.inv(W), inputs)
-        # else:
-        #     x = tf.einsum("ml,ijkl->ijkm", W, inputs)
-        #
-        # # print(tf.linalg.det(W))
-        # if logdet:
-        #     return x, inputs.shape[1] * inputs.shape[2] * tf.math.log(tf.math.abs(tf.linalg.det(W)))
-        # else:
-        #     return x, None
+        W = self.W
 
-        x = inputs[:,:,:,::-1]
+        if reverse:
+            x = tf.einsum("ml,ijkl->ijkm", tf.linalg.inv(W), inputs)
+        else:
+            x = tf.einsum("ml,ijkl->ijkm", W, inputs)
+
+        # print(tf.linalg.det(W))
         if logdet:
-            return x, 0
+            return x, inputs.shape[1] * inputs.shape[2] * tf.math.log(tf.math.abs(tf.linalg.det(W)))
         else:
             return x, None
+
+        # x = inputs[:,:,:,::-1]
+        # if logdet:
+        #     return x, 0
+        # else:
+        #     return x, None
 
 
 class BatchNormalization(tf.keras.layers.Layer):
@@ -97,23 +97,13 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 
     def nnLayer(self, channel_size):
         inputs = tf.keras.Input(shape=(None, None, channel_size // 2))
-        # x = tf.keras.layers.Conv2D(channel_size // 4, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(inputs)
-        # x = tf.keras.layers.BatchNormalization()(x)
-        # # x = tf.keras.layers.Dropout(DROPOUT_N)(x)
-        # x = tf.keras.layers.Conv2D(channel_size // 4, 3, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
-        # x = tf.keras.layers.BatchNormalization()(x)
-        # # x = tf.keras.layers.Dropout(DROPOUT_N)(x)
-        # x = tf.keras.layers.Conv2D(channel_size // 2, 1, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
-        # x = x + inputs
-        # x = tf.keras.layers.BatchNormalization()(x)
 
         x = tf.keras.layers.Conv2D(512, 3, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(inputs)
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Conv2D(512, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
         x = tf.keras.layers.BatchNormalization()(x)
 
-        # TODO: analyze these below
-        s = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        s = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
         t = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
 
         return tf.keras.Model(inputs, [tf.exp(s), t])

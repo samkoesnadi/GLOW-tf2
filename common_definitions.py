@@ -7,14 +7,12 @@ tf.random.set_seed(42)
 SQUEEZE_FACTOR = 4
 K_GLOW = 16
 L_GLOW = 3
-ACTIVATION = tf.nn.elu
+ACTIVATION = tf.nn.leaky_relu
 ALPHA_LEAKY_RELU = 0.2  # for activation in forward/backward block not the nn
 KERNEL_INITIALIZER_CLOSE_ZERO = tf.random_normal_initializer(0, 1e-6)
-# KERNEL_INITIALIZER_CLOSE_ZERO = tf.keras.initializers.he_normal()
 KERNEL_INITIALIZER = tf.keras.initializers.he_normal()
 # HARD_KERNEL_REGULARIZER = tf.keras.regularizers.L1L2(l1=0.03, l2=0.03)
 # SOFT_KERNEL_REGULARIZER = tf.keras.regularizers.l2(0.01)
-NUM_CLASSES = 100
 
 # training parameters
 LEARNING_RATE = 1e-4
