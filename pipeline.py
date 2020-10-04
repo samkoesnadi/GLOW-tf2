@@ -8,7 +8,7 @@ class Brain:
         self.model = GLOW(factor_size, k, l)
 
         # vars for training
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate, amsgrad=True)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate)
 
     @tf.function
     def train_step(self, inputs):

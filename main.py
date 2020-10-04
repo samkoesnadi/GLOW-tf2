@@ -57,6 +57,10 @@ if __name__ == "__main__":
     test_img = x_test[0][None,:]
     test_img_2 = x_test[1][None,:]
     test_z = np.random.normal(0, 1, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE))
+
+    # prepare for plt image results output
+    if not os.path.exists("./results"):
+        os.makedirs("./results")
     plt.imsave("./results/test_ref.png", np.squeeze(test_img))
     plt.imsave("./results/test_ref2.png", np.squeeze(test_img_2))
 

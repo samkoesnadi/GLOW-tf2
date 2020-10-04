@@ -5,11 +5,11 @@ tf.random.set_seed(42)
 
 # model parameter
 SQUEEZE_FACTOR = 4
-K_GLOW = 8
+K_GLOW = 16
 L_GLOW = 3
 ACTIVATION = tf.nn.elu
-ALPHA_LEAKY_RELU = 0.5  # for activation in forward/backward block not the nn
-KERNEL_INITIALIZER_CLOSE_ZERO = tf.random_normal_initializer(0, 1e-5)
+ALPHA_LEAKY_RELU = 0.2  # for activation in forward/backward block not the nn
+KERNEL_INITIALIZER_CLOSE_ZERO = tf.random_normal_initializer(0, 1e-6)
 # KERNEL_INITIALIZER_CLOSE_ZERO = tf.keras.initializers.he_normal()
 KERNEL_INITIALIZER = tf.keras.initializers.he_normal()
 # HARD_KERNEL_REGULARIZER = tf.keras.regularizers.L1L2(l1=0.03, l2=0.03)
@@ -17,10 +17,10 @@ KERNEL_INITIALIZER = tf.keras.initializers.he_normal()
 NUM_CLASSES = 100
 
 # training parameters
-LEARNING_RATE = 1e-3
-REGULARIZER_N = 1e-3
+LEARNING_RATE = 1e-4
+REGULARIZER_N = 1e-5
 LAMBDA_LIPSCHITZ = 1e-3
-BATCH_SIZE = 5
+BATCH_SIZE = 16
 SHUFFLE_SIZE = 10000
 EPOCHS = 100000
 IMG_SIZE = 32  # better to be mult of SQUEEZE_FACTOR

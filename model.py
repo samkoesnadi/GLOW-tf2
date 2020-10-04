@@ -16,24 +16,24 @@ class InvConv1(tf.keras.layers.Layer):
                                  trainable=True)
 
     def call(self, inputs, logdet=False, reverse=False):
-        W = self.W
-
-        if reverse:
-            x = tf.einsum("ml,ijkl->ijkm", tf.linalg.inv(W), inputs)
-        else:
-            x = tf.einsum("ml,ijkl->ijkm", W, inputs)
-
-        # print(tf.linalg.det(W))
-        if logdet:
-            return x, inputs.shape[1] * inputs.shape[2] * tf.math.log(tf.math.abs(tf.linalg.det(W)))
-        else:
-            return x, None
-
-        # x = inputs[::-1]
+        # W = self.W
+        #
+        # if reverse:
+        #     x = tf.einsum("ml,ijkl->ijkm", tf.linalg.inv(W), inputs)
+        # else:
+        #     x = tf.einsum("ml,ijkl->ijkm", W, inputs)
+        #
+        # # print(tf.linalg.det(W))
         # if logdet:
-        #     return x, 0
+        #     return x, inputs.shape[1] * inputs.shape[2] * tf.math.log(tf.math.abs(tf.linalg.det(W)))
         # else:
         #     return x, None
+
+        x = inputs[:,:,:,::-1]
+        if logdet:
+            return x, 0
+        else:
+            return x, None
 
 
 class BatchNormalization(tf.keras.layers.Layer):
@@ -43,22 +43,31 @@ class BatchNormalization(tf.keras.layers.Layer):
         # !!! Do not change the order of the add weight
         self.bn = tf.keras.layers.BatchNormalization()
 
+        # # temp var
+        # self._first = True
+
     def call(self, inputs, logdet=False, reverse=False):
         if reverse:
             beta = self.bn.beta
             gamma = self.bn.gamma
+            variance = self.bn.moving_variance
+            mean = self.bn.moving_mean
+            epsilon = self.bn.epsilon
+
             x = (inputs - beta) / gamma
             # x = inputs
 
             # TODO: check this below
-            variance = self.bn.moving_variance
-            epsilon = self.bn.epsilon
-            mean = self.bn.moving_mean
             x = x * tf.math.sqrt(variance + epsilon) + mean
         else:
             x = self.bn(inputs)
-            # x = (x - tf.math.reduce_mean(inputs)) / tf.math.reduce_std(inputs)
-            # print("bn", tf.math.reduce_std(x))
+
+            # if self._first:
+            #     self.bn.moving_mean = tf.reduce_mean(inputs, axis=[0,1,2])
+            #     self.bn.moving_variance = tf.math.reduce_variance(inputs, axis=[0,1,2])
+            #     x = self.bn(inputs)
+            #     self._first = False
+
 
         if logdet:
             variance = self.bn.moving_variance
@@ -105,17 +114,17 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 
         # TODO: analyze these below
         s = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
 
         return tf.keras.Model(inputs, [tf.exp(s), t])
 
     def forward_block(self, x, s, t):
         y = x * s + t
-        y = y if self.no_act else leakyrelu(y, alpha=ALPHA_LEAKY_RELU)
+        y = y if self.no_act else (y)
         return y
 
     def backward_block(self, y, s, t):
-        x = ((y if self.no_act else inv_leakyrelu(y, alpha=ALPHA_LEAKY_RELU)) - t) / s
+        x = ((y if self.no_act else (y)) - t) / s
         return x
 
     def call(self, inputs, logdet=False, reverse=False):
