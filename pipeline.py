@@ -10,14 +10,14 @@ class Brain:
         # vars for training
         self.optimizer = tf.keras.optimizers.Adam(learning_rate)
 
-    # @tf.function
+    @tf.function
     def train_step(self, inputs):
         with tf.GradientTape() as tape:
             tape.watch(inputs)
             z, logpx = self.model(inputs, logdet=True, training=True)
 
             # define the negative log-likelihood
-            nll = -logpx / (L_GLOW * K_GLOW)
+            nll = -logpx
             nll_and_reg = nll + REGULARIZER_N * tf.add_n(self.model.losses)
             # gradient_to_inputs = tf.clip_by_value((tf.norm(tape_inside.gradient(nll, inputs)) - 1) ** 2, 0, 1e10)
             # nll_and_reg += LAMBDA_LIPSCHITZ * gradient_to_inputs

@@ -14,15 +14,14 @@ if __name__ == "__main__":
     x_test = x_test.astype('float32')
 
     # bounding space
-    x_train = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_train / 255.)
     x_test = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_test / 255.)
 
     datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        brightness_range=(-0.2,0.2),
-        shear_range=0.2)
+        width_shift_range=0.05,
+        height_shift_range=0.05,
+        # horizontal_flip=True,
+        shear_range=0.05)
 
     # # convert class vectors to binary class matrices
     # NUM_CLASSES = 10
@@ -35,8 +34,13 @@ if __name__ == "__main__":
     # x_test = x_test[y_test==3]
     # y_test = y_test[y_test==3]
 
+    def random_transform(x):
+        x = datagen.random_transform(x)
+        x = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x / 255.)
+        return x
+
     def augment(x,y):
-        return (tf.reshape(tf.numpy_function(datagen.random_transform, inp=[x], Tout=tf.float32), (IMG_SIZE,IMG_SIZE,CHANNEL_SIZE)), y)
+        return (tf.reshape(tf.numpy_function(random_transform, inp=[x], Tout=tf.float32), (IMG_SIZE,IMG_SIZE,CHANNEL_SIZE)), y)
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))\
         .shuffle(SHUFFLE_SIZE)\
@@ -81,6 +85,9 @@ if __name__ == "__main__":
         # iteration per epoch
         with tqdm(train_dataset) as t:
             for x_t, y_t in t:
+                # print(tf.reduce_min(x_t), tf.reduce_max(x_t))
+                # plt.imshow(np.squeeze(x_t[0].numpy()))
+                # plt.show()
                 if _toggle_training:
                     z, _nll_x = brain.train_step(x_t)  # run the train step and store the nll in the variable
                     mean_z_squared(tf.reduce_mean(z, axis=-1)**2)

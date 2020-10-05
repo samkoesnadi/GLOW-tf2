@@ -95,12 +95,12 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         # x += inputs  # residual
         x = tf.keras.layers.BatchNormalization()(x)
 
-        s = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
+        s = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 3, activation="tanh", kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
 
         # postprocess s & t
-        s = tf.nn.tanh(s) * ALPHA_S_T
-        t = tf.nn.tanh(t) * ALPHA_S_T
+        s *= ALPHA_S_T
+        t *= ALPHA_S_T
 
         # s = tf.clip_by_value(s, 0, 0.1)
         # t = tf.clip_by_value(t, -0.5, 0.5)
@@ -139,10 +139,9 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
             v2 = u2
 
         if logdet:
-            _logabsdet = log_abs(self.W[0]) + \
-                         tf.reduce_mean(log_abs(tf.exp(s2)), 0)
+            _logabsdet = tf.reduce_sum(tf.reduce_mean(log_abs(self.W * tf.exp(s2)), 0))
                          # tf.reduce_mean(log_abs(dleakyrelu(self.forward_small_block(u1, s2, t2))), 0)
-            return (v1, v2), tf.reduce_sum(_logabsdet)
+            return (v1, v2), _logabsdet
         else:
             return (v1, v2), None
 
@@ -309,9 +308,6 @@ class GLOW(tf.keras.Model):
                     z.append(tf.reshape(yb, [yb.shape[0], -1]))
 
             z_total = tf.concat(z, axis=-1)
-            # print(tf.reduce_max(z_total[:, 0]), tf.reduce_min(z_total[:, 0]))
-            # print(tf.reduce_max(z_total[:, -1]), tf.reduce_min(z_total[:, -1]))
-            # print(logpzs, logdet_fs_total)
             if logdet:
                 # this is when the objective is defined
                 mean_var = tf.zeros_like(z_total)
@@ -319,8 +315,7 @@ class GLOW(tf.keras.Model):
                 var = mean_var + 1.
                 logpzs = logpz(mean, var, z_total)
 
-                # print(logpzs, logdet_fs_total)
-                # print(logpzs / BATCH_SIZE, logdet_fs_total)
+                # tf.print(logpzs, logdet_fs_total)
                 return z_total, logpzs + logdet_fs_total
             else:
                 return z_total, None
