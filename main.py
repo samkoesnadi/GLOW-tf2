@@ -12,8 +12,10 @@ if __name__ == "__main__":
 
     x_train = x_train.astype('float32')
     x_test = x_test.astype('float32')
-    x_train /= 255
-    x_test /= 255
+
+    # bounding space
+    x_train = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_train / 255)
+    x_test = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_test / 255)
 
     datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         rotation_range=20,
@@ -102,18 +104,18 @@ if __name__ == "__main__":
                              step=ep)
 
         # store image for evaluation
-        plt.imsave("./results/test.png", tf.clip_by_value(brain.model(
+        plt.imsave("./results/test.png", tf.clip_by_value(tf.squeeze(brain.model(
                     (brain.model(test_img)[0]+brain.model(test_img_2)[0])/2,
-                    reverse=True)[0][0], 0, 1).numpy())
-        plt.imsave("./results/test2.png", tf.clip_by_value(brain.model(
+                    reverse=True)[0][0]), 0, 1).numpy())
+        plt.imsave("./results/test2.png", tf.clip_by_value(tf.squeeze(brain.model(
                     test_z,
-                    reverse=True)[0][0], 0, 1).numpy())
-        plt.imsave("./results/test3.png", tf.clip_by_value(brain.model(
+                    reverse=True)[0][0]), 0, 1).numpy())
+        plt.imsave("./results/test3.png", tf.clip_by_value(tf.squeeze(brain.model(
                     (brain.model(test_img)[0]),
-                    reverse=True)[0][0], 0, 1).numpy())
-        plt.imsave("./results/test4.png", tf.clip_by_value(brain.model(
+                    reverse=True)[0][0]), 0, 1).numpy())
+        plt.imsave("./results/test4.png", tf.clip_by_value(tf.squeeze(brain.model(
                     np.random.normal(0, 0.5, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
-                    reverse=True)[0][0], 0, 1).numpy())
-        plt.imsave("./results/test5.png", tf.clip_by_value(brain.model(
+                    reverse=True)[0][0]), 0, 1).numpy())
+        plt.imsave("./results/test5.png", tf.clip_by_value(tf.squeeze(brain.model(
                     np.random.normal(0, 0.2, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
-                    reverse=True)[0][0], 0, 1).numpy())
+                    reverse=True)[0][0]), 0, 1).numpy())

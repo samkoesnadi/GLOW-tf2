@@ -14,14 +14,13 @@ class InvConv1(tf.keras.layers.Layer):
                                  initializer=tf.keras.initializers.Orthogonal(),
                                  regularizer=det_1_reg,
                                  trainable=True)
+        self.channel_size = channel_size
 
     def call(self, inputs, logdet=False, reverse=False):
-        W = self.W
+        # W = tf.nn.softmax(self.W, axis=-1)
+        W = tf.reshape(tf.linalg.inv(self.W) if reverse else self.W, [1,1,self.channel_size,self.channel_size])
 
-        if reverse:
-            x = tf.einsum("ml,ijkl->ijkm", tf.linalg.inv(W), inputs)
-        else:
-            x = tf.einsum("ml,ijkl->ijkm", W, inputs)
+        x = tf.nn.conv2d(inputs, W, [1,1,1,1], padding="SAME")
 
         if logdet:
             return x, inputs.shape[1] * inputs.shape[2] * tf.math.log(tf.math.abs(tf.linalg.det(W)))
@@ -75,30 +74,33 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         self.nn1 = self.nnLayer(channel_size)
         self.nn2 = self.nnLayer(channel_size)
 
-        # self.W = self.add_weight("W", shape=(1, 1, 1, channel_size,),
-        #                          initializer=KERNEL_INITIALIZER,
-        #                          trainable=True)
-
     def nnLayer(self, channel_size):
         inputs = tf.keras.Input(shape=(None, None, channel_size // 2))
 
-        x = tf.keras.layers.Conv2D(512, 3, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(inputs)
+        x = tf.keras.layers.Conv2D(512, 3, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(inputs)
         x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Conv2D(512, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
+        x = tf.keras.layers.Conv2D(512, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
         x = tf.keras.layers.BatchNormalization()(x)
 
-        s = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        s = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 3, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=SOFT_KERNEL_REGULARIZER, padding="same")(x)
+
+        # implement resnet
+        s += inputs
+        t += inputs
+
+        # postprocess s & t
+        s = tf.nn.tanh(s) * ALPHA_S_T
+        t = tf.nn.tanh(t) * ALPHA_S_T
 
         return tf.keras.Model(inputs, [tf.exp(s), t])
 
     def forward_block(self, x, s, t):
         y = x * s + t
-        y = y if self.no_act else y
         return y
 
     def backward_block(self, y, s, t):
-        x = ((y if self.no_act else y) - t) / s
+        x = (y - t) / s
         return x
 
     def call(self, inputs, logdet=False, reverse=False, training=False):
@@ -345,7 +347,9 @@ if __name__ == "__main__":
     # model.load_weights(CHECKPOINT_PATH+".h5")
 
     # print(model(a, logdet=True, reverse=False))
-    a_1 = model(model(a)[0], reverse=True)[0]
+    z = model(a)[0]
+    print(tf.reduce_min(z), tf.reduce_max(z))
+    a_1 = model(z, reverse=True)[0]
     a_1 = my_tf_round(a_1, 3)  # round it
 
     print(tf.reduce_sum(tf.cast(a!=a_1, dtype=tf.float32)))
