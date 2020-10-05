@@ -10,7 +10,7 @@ class Brain:
         # vars for training
         self.optimizer = tf.keras.optimizers.Adam(learning_rate)
 
-    @tf.function
+    # @tf.function
     def train_step(self, inputs):
         with tf.GradientTape() as tape:
             tape.watch(inputs)
@@ -27,7 +27,7 @@ class Brain:
         # tf.print([tf.reduce_mean(tf.abs(m_g)) for m_g in model_gradients])
         self.optimizer.apply_gradients(zip(model_gradients, self.model.trainable_variables))
 
-        return z, nll_and_reg
+        return z, nll
 
     def save_weights(self, path):
         parent_dir = os.path.dirname(path)

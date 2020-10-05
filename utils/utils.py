@@ -77,6 +77,11 @@ def leakyrelu(z, alpha=0.2):
 def inv_leakyrelu(y, alpha=0.2):
     return tf.where(y < 0, y / alpha, y)
 
+def dleakyrelu(x, alpha=0.2):
+  dx = np.ones_like(x)
+  dx[x < 0] = alpha
+  return dx
+
 def d_elu(x):
     """
     derivative of elu
@@ -100,7 +105,9 @@ def logpz(mean, var, x):
     :param x: (bsxn)
     :return: ()
     """
-    return tf.reduce_sum(-0.5 * (tf.math.log(2 * np.pi) - tf.math.log(var**.5)) - .5 * ((x - mean) / var**.5) ** 2)
+    return tf.reduce_sum(
+        tf.reduce_mean(-0.5 * (tf.math.log(2 * np.pi) - tf.math.log(var**.5)) - .5 * (x - mean)**2 / var, 0)
+    )
     # var_matrix = tf.linalg.diag(var)
     # k = mean.shape[0]
     # mean = mean[None, :]  # because there is no dimensionalty in the mean

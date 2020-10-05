@@ -3,7 +3,7 @@ from utils.utils import *
 
 
 x = tf.random.normal((512,512), 0, 1, dtype=tf.float32)
-y = tf.random.normal((512,512), 0, 1, dtype=tf.float32)
+y = tf.random.normal((512,512), 0, 0, dtype=tf.float32)
 
 mean = tf.zeros((512,))
 var = tf.ones((512,))

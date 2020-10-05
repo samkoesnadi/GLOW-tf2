@@ -14,8 +14,8 @@ if __name__ == "__main__":
     x_test = x_test.astype('float32')
 
     # bounding space
-    x_train = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_train / 255)
-    x_test = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_test / 255)
+    x_train = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_train / 255.)
+    x_test = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x_test / 255.)
 
     datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         rotation_range=20,
@@ -29,11 +29,11 @@ if __name__ == "__main__":
     # y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
     # y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
 
-    # filter to train
-    x_train = x_train[y_train==3]
-    y_train = y_train[y_train==3]
-    x_test = x_test[y_test==3]
-    y_test = y_test[y_test==3]
+    # # filter to train
+    # x_train = x_train[y_train==3]
+    # y_train = y_train[y_train==3]
+    # x_test = x_test[y_test==3]
+    # y_test = y_test[y_test==3]
 
     def augment(x,y):
         return (tf.reshape(tf.numpy_function(datagen.random_transform, inp=[x], Tout=tf.float32), (IMG_SIZE,IMG_SIZE,CHANNEL_SIZE)), y)
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     # Step 2. the brain
     brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, LEARNING_RATE)
 
-    # load weight if available
-    print(brain.load_weights(CHECKPOINT_PATH))
+    # # load weight if available
+    # print(brain.load_weights(CHECKPOINT_PATH))
 
     # Step 3. training iteration
 
@@ -71,20 +71,25 @@ if __name__ == "__main__":
     train_log_dir = TENSORBOARD_LOGDIR + current_time + '/train'
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
 
+    _toggle_training = False
     for ep in range(EPOCHS):
         print(f"epoch {ep+1}/{EPOCHS}")
         nll.reset_states()
         mean_z_squared.reset_states()
         var_z.reset_states()
-
+        
         # iteration per epoch
         with tqdm(train_dataset) as t:
             for x_t, y_t in t:
-                z, _nll_x = brain.train_step(x_t)  # run the train step and store the nll in the variable
-                mean_z_squared(tf.reduce_mean(z, axis=-1)**2)
-                var_z(tf.math.reduce_variance(z, axis=-1))
-                nll(_nll_x)
-                t.set_postfix(nll=nll.result().numpy(), mean_sq=mean_z_squared.result().numpy(), var=var_z.result().numpy())
+                if _toggle_training:
+                    z, _nll_x = brain.train_step(x_t)  # run the train step and store the nll in the variable
+                    mean_z_squared(tf.reduce_mean(z, axis=-1)**2)
+                    var_z(tf.math.reduce_variance(z, axis=-1))
+                    nll(_nll_x)
+                    t.set_postfix(nll=nll.result().numpy(), mean_sq=mean_z_squared.result().numpy(), var=var_z.result().numpy())
+                else:  # to initiate some variables necessary
+                    brain.model(x_t, training=True)
+                    _toggle_training = True
 
         # save weight every epoch
         brain.save_weights(CHECKPOINT_PATH)
