@@ -28,11 +28,11 @@ if __name__ == "__main__":
     # y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
     # y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
 
-    # # filter to train
-    # x_train = x_train[y_train==3]
-    # y_train = y_train[y_train==3]
-    # x_test = x_test[y_test==3]
-    # y_test = y_test[y_test==3]
+    # filter to train
+    x_train = x_train[y_train==3]
+    y_train = y_train[y_train==3]
+    x_test = x_test[y_test==3]
+    y_test = y_test[y_test==3]
 
     def random_transform(x):
         x = datagen.random_transform(x)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         .prefetch(tf.data.experimental.AUTOTUNE)
 
     # Step 2. the brain
-    brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, LEARNING_RATE)
+    brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, IMG_SIZE, LEARNING_RATE)
 
     # # load weight if available
     # print(brain.load_weights(CHECKPOINT_PATH))
@@ -106,28 +106,14 @@ if __name__ == "__main__":
             tf.summary.scalar('nll', nll.result(), step=ep)
             tf.summary.scalar('mean_sq', mean_z_squared.result(), step=ep)
             tf.summary.scalar('var', var_z.result(), step=ep)
-            tf.summary.image("inverted", tf.clip_by_value(brain.model(
-                    brain.model(test_img)[0],
-                    reverse=True)[0], 0, 1),
-                             step=ep)
-            tf.summary.image("from_random_07", tf.clip_by_value(brain.model(
-                    np.random.normal(0, 0.7, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
-                    reverse=True)[0], 0, 1),
-                             step=ep)
+            tf.summary.image("inverted", tf.clip_by_value(brain.backward(brain.forward(test_img)), 0, 1), step=ep)
+            tf.summary.image("from_random_07", tf.clip_by_value(brain.sample(temp=0.7), 0, 1), step=ep)
 
         # store image for evaluation
-        plt.imsave("./results/test.png", tf.clip_by_value(tf.squeeze(brain.model(
-                    (brain.model(test_img)[0]+brain.model(test_img_2)[0])/2,
-                    reverse=True)[0][0]), 0, 1).numpy())
-        plt.imsave("./results/test2.png", tf.clip_by_value(tf.squeeze(brain.model(
-                    test_z,
-                    reverse=True)[0][0]), 0, 1).numpy())
-        plt.imsave("./results/test3.png", tf.clip_by_value(tf.squeeze(brain.model(
-                    (brain.model(test_img)[0]),
-                    reverse=True)[0][0]), 0, 1).numpy())
-        plt.imsave("./results/test4.png", tf.clip_by_value(tf.squeeze(brain.model(
-                    np.random.normal(0, 0.5, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
-                    reverse=True)[0][0]), 0, 1).numpy())
-        plt.imsave("./results/test5.png", tf.clip_by_value(tf.squeeze(brain.model(
-                    np.random.normal(0, 0.2, (1, IMG_SIZE * IMG_SIZE * CHANNEL_SIZE)),
-                    reverse=True)[0][0]), 0, 1).numpy())
+        plt.imsave("./results/test.png", tf.clip_by_value(tf.squeeze(brain.backward(
+                    (brain.forward(test_img) + brain.forward(test_img_2)) / 2)), 0, 1).numpy())
+        plt.imsave("./results/test2.png", tf.clip_by_value(tf.squeeze(brain.backward(test_z)), 0, 1).numpy())
+        plt.imsave("./results/test3.png", tf.clip_by_value(tf.squeeze(brain.backward(
+                    (brain.forward(test_img)))), 0, 1).numpy())
+        plt.imsave("./results/test4.png", tf.clip_by_value(tf.squeeze(brain.sample(1.)), 0, 1).numpy())
+        plt.imsave("./results/test5.png", tf.clip_by_value(tf.squeeze(brain.sample(0.2)), 0, 1).numpy())

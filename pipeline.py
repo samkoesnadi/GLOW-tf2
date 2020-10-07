@@ -4,26 +4,41 @@ import os
 
 
 class Brain:
-    def __init__(self, factor_size, k, l, learning_rate=LEARNING_RATE):
-        self.model = GLOW(factor_size, k, l)
+    def __init__(self, factor_size, k, l, img_size, learning_rate=LEARNING_RATE):
+        self.model = GLOW(factor_size, k, l, img_size)
 
         # vars for training
         self.optimizer = tf.keras.optimizers.Adam(learning_rate)
 
+    def sample(self, temp=1.):
+        return self.model.sample(temp)
+
+    def forward(self, inputs):
+        return self.model(inputs)[0]
+
+    def backward(self, inputs):
+        return self.model(inputs, reverse=True)[0]
+
     @tf.function
     def train_step(self, inputs):
+        # with tf.GradientTape() as tape:
+        #     with tf.GradientTape() as tape_inside:
+        #         tape_inside.watch(inputs)
+        #         z, logpx = self.model(inputs, logdet=True, training=True)
+        #
+        #         # define the negative log-likelihood
+        #         nll = tf.clip_by_value(-logpx, -1e9, 1e9)
+        #     gradient_to_inputs = (tf.norm(tape_inside.gradient(nll, inputs)) - 1) ** 2
+        #     nll += LAMBDA_LIPSCHITZ * gradient_to_inputs
+
         with tf.GradientTape() as tape:
             tape.watch(inputs)
             z, logpx = self.model(inputs, logdet=True, training=True)
 
             # define the negative log-likelihood
-            nll = -logpx
-            nll_and_reg = nll + REGULARIZER_N * tf.add_n(self.model.losses)
-            # gradient_to_inputs = tf.clip_by_value((tf.norm(tape_inside.gradient(nll, inputs)) - 1) ** 2, 0, 1e10)
-            # nll_and_reg += LAMBDA_LIPSCHITZ * gradient_to_inputs
-        # print(tf.add_n(self.model.losses))
-        # print(tf.add_n(self.model.losses))
-        model_gradients = tape.gradient(nll_and_reg, self.model.trainable_variables)
+            nll = tf.clip_by_value(-logpx, -1e9, 1e9)
+
+        model_gradients = tape.gradient(nll, self.model.trainable_variables)
         # tf.print([tf.reduce_mean(tf.abs(m_g)) for m_g in model_gradients])
         self.optimizer.apply_gradients(zip(model_gradients, self.model.trainable_variables))
 

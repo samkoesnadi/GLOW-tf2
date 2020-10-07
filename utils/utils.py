@@ -97,7 +97,7 @@ def my_tf_round(x, decimals = 0):
     multiplier = tf.constant(10**decimals, dtype=x.dtype)
     return tf.round(x * multiplier) / multiplier
 
-def logpz(mean, var, x):
+def logpz(mean, lstd, x):
     """
 
     :param mean: (bsxn)
@@ -108,9 +108,7 @@ def logpz(mean, var, x):
     # return tf.reduce_sum(
     #     tf.reduce_mean(-0.5 * (tf.math.log(2 * np.pi) - tf.math.log(var**.5)) - .5 * (x - mean)**2 / var, 0)
     # )
-    return tf.reduce_mean(
-        tf.reduce_sum(-0.5 * (tf.math.log(2 * np.pi) - tf.math.log(var**.5)) - .5 * (x - mean)**2 / var, 0)
-    )
+    return tf.reduce_sum(-0.5 * (np.log(2 * np.pi) + 2. * lstd + (x - mean) ** 2 / tf.exp(2. * lstd)), 1)
 
     # var_matrix = tf.linalg.diag(var)
     # k = mean.shape[0]
