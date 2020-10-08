@@ -9,7 +9,7 @@ class Z_Norm_IntermediateLayer(tf.keras.layers.Layer):
     def build(self, input_shape):
         channel_size = input_shape[-1]
         # self.mean_lstd = tf.keras.layers.Dense(channel_size * 2, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
-        self.mean_lstd = tf.keras.layers.Conv2D(channel_size * 2, 4, padding="same", kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), kernel_regularizer=KERNEL_REGULARIZER)
+        self.mean_lstd = tf.keras.layers.Conv2D(channel_size * 2, 1, padding="same", kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0))
         self.channel_size = channel_size * 2
 
     def call(self, v1, v2, logdet=False, reverse=False):
@@ -186,11 +186,6 @@ class ActNormalization(tf.keras.layers.Layer):
 
 class AffineCouplingLayer(tf.keras.layers.Layer):
     def __init__(self):
-        """
-
-        :param channel_size:
-        :param no_act: no activation in forward and backward (important for last layer)
-        """
         super().__init__()
 
     def build(self, input_shape):
@@ -205,8 +200,10 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 
         x = tf.keras.layers.Conv2D(512, 4, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(inputs)
         x = ActNormalization(output_only_one=True)(x)
+        x = tf.keras.layers.Dropout(DROPOUT_N)(x)
         x = tf.keras.layers.Conv2D(512, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
         x = ActNormalization(output_only_one=True)(x)
+        x = tf.keras.layers.Dropout(DROPOUT_N)(x)
 
         s = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(2.), padding="same")(x)
         t = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(-2.), padding="same")(x)

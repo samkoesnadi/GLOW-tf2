@@ -7,8 +7,15 @@ class Brain:
     def __init__(self, factor_size, k, l, img_size, learning_rate=LEARNING_RATE):
         self.model = GLOW(factor_size, k, l, img_size)
 
+        # lr scheduler
+        lr_scheduler = tf.keras.optimizers.schedules.ExponentialDecay(
+            learning_rate,
+            decay_steps=1111,
+            decay_rate=0.91,
+            staircase=True)
+
         # vars for training
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate)
+        self.optimizer = tf.keras.optimizers.Adam(lr_scheduler)
 
     def sample(self, temp=1.):
         return self.model.sample(temp)
@@ -36,7 +43,7 @@ class Brain:
             z, logpx = self.model(inputs, logdet=True, training=True)
 
             # define the negative log-likelihood
-            nll = tf.clip_by_value(-logpx, -1e9, 1e9) + REGULARIZER_N * tf.add_n(self.model.losses)
+            nll = tf.clip_by_value(-logpx, -1e9, 1e9)
 
         model_gradients = tape.gradient(nll, self.model.trainable_variables)
         # tf.print([tf.reduce_mean(tf.abs(m_g)) for m_g in model_gradients])

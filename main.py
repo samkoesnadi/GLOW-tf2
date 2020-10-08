@@ -5,7 +5,16 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Step 1. the data, split between train and test sets
-    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+    if DATASET == "mnist":
+        dataset = tf.keras.datasets.mnist
+    elif DATASET == "cifar10":
+        dataset = tf.keras.datasets.cifar10
+    elif DATASET == "cifat100":
+        dataset = tf.keras.datasets.cifar100
+    else:
+        raise Exception("no defined dataset")
+
+    (x_train, y_train), (x_test, y_test) = dataset.load_data()
 
     x_train = x_train.reshape(x_train.shape[0], IMG_SIZE, IMG_SIZE, CHANNEL_SIZE)
     x_test = x_test.reshape(x_test.shape[0], IMG_SIZE, IMG_SIZE, CHANNEL_SIZE)
@@ -28,11 +37,11 @@ if __name__ == "__main__":
     # y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
     # y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
 
-    # filter to train
-    x_train = x_train[y_train==3]
-    y_train = y_train[y_train==3]
-    x_test = x_test[y_test==3]
-    y_test = y_test[y_test==3]
+    # # filter to train
+    # x_train = x_train[y_train==3]
+    # y_train = y_train[y_train==3]
+    # x_test = x_test[y_test==3]
+    # y_test = y_test[y_test==3]
 
     def random_transform(x):
         x = datagen.random_transform(x)
