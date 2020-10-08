@@ -58,7 +58,7 @@ if __name__ == "__main__":
         .prefetch(tf.data.experimental.AUTOTUNE)
 
     # Step 2. the brain
-    brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, IMG_SIZE, LEARNING_RATE)
+    brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, IMG_SIZE, CHANNEL_SIZE, LEARNING_RATE)
 
     # # load weight if available
     # print(brain.load_weights(CHECKPOINT_PATH))
@@ -105,6 +105,7 @@ if __name__ == "__main__":
                     t.set_postfix(nll=nll.result().numpy(), mean_sq=mean_z_squared.result().numpy(), var=var_z.result().numpy())
                 else:  # to initiate some variables necessary
                     brain.model(x_t, training=True)
+                    if LOAD_WEIGHT: print(brain.load_weights(CHECKPOINT_PATH))
                     _toggle_training = True
 
         # save weight every epoch

@@ -4,8 +4,8 @@ import os
 
 
 class Brain:
-    def __init__(self, factor_size, k, l, img_size, learning_rate=LEARNING_RATE):
-        self.model = GLOW(factor_size, k, l, img_size)
+    def __init__(self, factor_size, k, l, img_size, channel_size, learning_rate=LEARNING_RATE):
+        self.model = GLOW(factor_size, k, l, img_size, channel_size)
 
         # lr scheduler
         lr_scheduler = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -60,7 +60,7 @@ class Brain:
 
     def load_weights(self, path):
         try:
-            self.actor_network.load_weights(path + ".h5")
+            self.model.load_weights(path + ".h5")
         except:
             return "Weights cannot be loaded"
         return "Weights loaded"

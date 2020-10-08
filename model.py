@@ -320,20 +320,18 @@ class SqueezeLayer(tf.keras.layers.Layer):
 
 
 class GLOW(tf.keras.Model):
-    def __init__(self, factor_size, K, L, img_size):
+    def __init__(self, factor_size, K, L, img_size, channel_size):
         super().__init__()
 
         # variables
         sqrt_factor_size = int(factor_size ** .5)  # sqrt the factor size as it is per dimension
-        self.channel_order = [int(CHANNEL_SIZE * factor_size ** (l + 1) / 2 ** l) for l in
-                              range(L)]  # channel order in the multi-scale architecture
+        self.channel_size = channel_size
 
         # layers
         # self.cropifnotfitlayer = CropIfNotFitLayer(sqrt_factor_size)
         self.squeezelayers = [SqueezeLayer(sqrt_factor_size) for _ in range(L)]
-        self.flowsteps = [[FlowStep() for _ in range(K)] for c in
-                          self.channel_order]
-        self.logpzlayers = [Z_Norm_IntermediateLayer() for c in self.channel_order[:-1]]
+        self.flowsteps = [[FlowStep() for _ in range(K)] for _ in range(L)]
+        self.logpzlayers = [Z_Norm_IntermediateLayer() for _ in range(L-1)]
         self.logpzlayers_last = Z_Norm_LastLayer()
 
         # constant var
@@ -391,7 +389,7 @@ class GLOW(tf.keras.Model):
         else:
             assert not logdet  # inv cant have logdet
             z_total = inputs
-            z_sizes = [(self.img_size // 2 ** (i_l + 1))**2 * 2 ** (i_l + 1) for i_l in
+            z_sizes = [(self.img_size // 2 ** (i_l + 1))**2 * self.channel_size * 2 ** (i_l + 1) for i_l in
                        range(self.L)]  # the sizes as effect to the multi-scale arch
             x = None
 
@@ -402,7 +400,8 @@ class GLOW(tf.keras.Model):
 
                 z_total, z = split_last_channel(z_total, boundary=-z_size)  # get the z
 
-                za_channel_size = self.channel_order[i_l] if i_l == self.L - 1 else self.channel_order[i_l] // 2
+                channel_order = int(CHANNEL_SIZE * self.factor_size ** (i_l + 1) / 2 ** i_l)
+                za_channel_size = channel_order if i_l == self.L - 1 else channel_order // 2
                 wh_size = self.img_size // 2 ** (i_l + 1)
 
                 if i_l == self.L - 1:
@@ -419,10 +418,6 @@ class GLOW(tf.keras.Model):
 
                 # run flow step for K times
                 for i_k in reversed(range(self.K - 1)):
-                    # unswitch the two layers
-                    xa, xb = split_last_channel(x)
-                    x = concat_last_channel(xa, xb)
-
                     x, _ = self.flowsteps[i_l][i_k](x, logdet, reverse)
 
                 # unsqueeze
@@ -434,9 +429,6 @@ class GLOW(tf.keras.Model):
         x = None
 
         for i_l in reversed(range(self.L)):
-            za_channel_size = self.channel_order[i_l]
-            wh_size = self.img_size // 2**(i_l+1)
-
             if i_l == self.L - 1:
                 # reverse the renorm last k
                 z = self.logpzlayers_last.sample(temp)
@@ -450,10 +442,6 @@ class GLOW(tf.keras.Model):
 
             # run flow step for K times
             for i_k in reversed(range(self.K - 1)):
-                # unswitch the two layers
-                xa, xb = split_last_channel(x)
-                x = concat_last_channel(xa, xb)
-
                 x, _ = self.flowsteps[i_l][i_k](x, reverse=True)
 
             # unsqueeze
@@ -480,7 +468,7 @@ if __name__ == "__main__":
     # tf.assert_equal(a__, a)
     # exit()
 
-    model = GLOW(SQUEEZE_FACTOR, K_GLOW, L_GLOW, IMG_SIZE)
+    model = GLOW(SQUEEZE_FACTOR, K_GLOW, L_GLOW, IMG_SIZE, CHANNEL_SIZE)
     # import time
     # model(a)[0]
     # model.load_weights(CHECKPOINT_PATH+".h5")
