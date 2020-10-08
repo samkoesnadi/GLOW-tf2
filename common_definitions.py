@@ -8,13 +8,13 @@ SQUEEZE_FACTOR = 4
 K_GLOW = 16
 L_GLOW = 2
 ACTIVATION = tf.nn.relu
-KERNEL_INITIALIZER_CLOSE_ZERO = tf.random_normal_initializer(0, 1e-5)
+KERNEL_INITIALIZER_CLOSE_VALUE = lambda x=0: tf.random_normal_initializer(x, 1e-4)
 KERNEL_INITIALIZER = tf.keras.initializers.he_normal()
 KERNEL_REGULARIZER = tf.keras.regularizers.l2()
 
 # training parameters
 LEARNING_RATE = 1e-3
-REGULARIZER_N = 1e-5
+REGULARIZER_N = 0.
 # LAMBDA_LIPSCHITZ = 1e-3
 BATCH_SIZE = 128
 SHUFFLE_SIZE = 10000

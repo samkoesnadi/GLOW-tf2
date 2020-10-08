@@ -9,7 +9,7 @@ class Z_Norm_IntermediateLayer(tf.keras.layers.Layer):
     def build(self, input_shape):
         channel_size = input_shape[-1]
         # self.mean_lstd = tf.keras.layers.Dense(channel_size * 2, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
-        self.mean_lstd = tf.keras.layers.Conv2D(channel_size * 2, 1, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
+        self.mean_lstd = tf.keras.layers.Conv2D(channel_size * 2, 4, padding="same", kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), kernel_regularizer=KERNEL_REGULARIZER)
         self.channel_size = channel_size * 2
 
     def call(self, v1, v2, logdet=False, reverse=False):
@@ -48,7 +48,7 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         channel_size = input_shape[-1]
-        self.mean_lstd = self.add_weight("Mean, Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_ZERO, trainable=True)
+        self.mean_lstd = self.add_weight("Mean, Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), trainable=True)
         self.channel_size = channel_size * 2
 
     def call(self, v1, logdet=False, reverse=False):
@@ -208,22 +208,16 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         x = tf.keras.layers.Conv2D(512, 1, activation=ACTIVATION, kernel_initializer=KERNEL_INITIALIZER, padding="same")(x)
         x = ActNormalization(output_only_one=True)(x)
 
-        # x += inputs  # residual
-        # x = tf.keras.layers.BatchNormalization()(x)
-
-        s = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        s = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(2.), padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(-2.), padding="same")(x)
 
         # postprocess s & t
-        # s = tf.nn.tanh(s + 1.)
-        s = tf.nn.sigmoid(s + 2.)
-        t = tf.nn.sigmoid(t - 2.)
+        s = tf.nn.sigmoid(s)
+        t = tf.nn.sigmoid(t)
 
         return tf.keras.Model(inputs, [s, t])
 
     def forward_block(self, x, s, t):
-        # tf.print(tf.reduce_max(s), tf.reduce_min(s))
-        # tf.print("t", tf.reduce_max(t), tf.reduce_min(t))
         y = x * s + t
         return y
 
@@ -239,18 +233,14 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
 
             # change convention for variable purpose
             v1 = u1
-
-            # print(v1[0, 0, 0, 0], v2[0, 0, 0, 0], tf.reduce_max(v1), tf.reduce_min(v1))
         else:
             u1, u2 = split_last_channel(inputs)
-            # print(u1[0, 0, 0, 0], u2[0, 0, 0, 0], tf.reduce_max(u1), tf.reduce_min(u1))
             s2, t2 = self.nn(u2, training=training)
             v1 = self.forward_block(u1, s2, t2)
             v2 = u2
 
         if logdet:
             _logabsdet = tf.reduce_mean(tf.reduce_sum(log_abs(s2), [1,2,3]), 0)
-                         # tf.reduce_mean(log_abs(dleakyrelu(self.forward_small_block(u1, s2, t2))), 0)
             return (v1, v2), _logabsdet
         else:
             return (v1, v2), None
