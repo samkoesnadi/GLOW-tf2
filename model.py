@@ -206,7 +206,7 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         x = tf.keras.layers.Dropout(DROPOUT_N)(x)
 
         s = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(2.), padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(-2.), padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0.), padding="same")(x)
 
         # postprocess s & t
         s = tf.nn.sigmoid(s)
@@ -385,7 +385,7 @@ class GLOW(tf.keras.Model):
 
             z_total = tf.concat(z, axis=-1)
             if logdet:
-                return z_total, tf.squeeze(logdet_fs_total / tf.math.log(2.) / (self.L * self.K))  # divide by all pixel... this is now in bits/dim
+                return z_total, tf.squeeze(logdet_fs_total / tf.math.log(2.))  # divide by all pixel... this is now in bits/dim
             else:
                 return z_total, None
         else:
