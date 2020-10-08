@@ -10,7 +10,8 @@ class Z_Norm_IntermediateLayer(tf.keras.layers.Layer):
         channel_size = input_shape[-1]
         # self.mean_lstd = tf.keras.layers.Dense(channel_size * 2, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
         self.mean_lstd = tf.keras.layers.Conv2D(channel_size * 2, 1, padding="same", kernel_initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0))
-        self.channel_size = channel_size * 2
+        self.channel_size = channel_size
+        self.img_width = input_shape[1]
 
     def call(self, v1, v2, logdet=False, reverse=False):
         """
@@ -39,7 +40,7 @@ class Z_Norm_IntermediateLayer(tf.keras.layers.Layer):
         mean_lstd = self.mean_lstd(v2)
         mean, lstd = split_last_channel(mean_lstd)
         std = tf.exp(lstd) * temp
-        return mean + std * tf.random.normal((1, self.channel_size // 2))
+        return mean + std * tf.random.normal((1, self.img_width, self.img_width, self.channel_size))
 
 
 class Z_Norm_LastLayer(tf.keras.layers.Layer):
@@ -49,7 +50,8 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
     def build(self, input_shape):
         channel_size = input_shape[-1]
         self.mean_lstd = self.add_weight("Mean, Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), trainable=True)
-        self.channel_size = channel_size * 2
+        self.channel_size = channel_size
+        self.img_width = input_shape[1]
 
     def call(self, v1, logdet=False, reverse=False):
         """
@@ -78,7 +80,7 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
         mean_lstd = self.mean_lstd
         mean, lstd = split_last_channel(mean_lstd)
         std = tf.exp(lstd) * temp
-        return mean + std * tf.random.normal((1, self.channel_size // 2))
+        return mean + std * tf.random.normal((1, self.img_width, self.img_width, self.channel_size))
 
 
 class InvConv1(tf.keras.layers.Layer):
@@ -142,7 +144,6 @@ class BatchNormalization(tf.keras.layers.Layer):
             variance = self.bn.moving_variance
             epsilon = self.bn.epsilon
             gamma = self.bn.gamma
-            # tf.print(variance, gamma)
             return x, inputs.shape[1] * inputs.shape[2] * tf.reduce_sum(log_abs(gamma * (variance + epsilon) ** (-.5)))
         else:
             return x, None
