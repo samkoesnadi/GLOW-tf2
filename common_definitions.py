@@ -13,8 +13,8 @@ KERNEL_INITIALIZER = tf.keras.initializers.he_normal()
 KERNEL_REGULARIZER = tf.keras.regularizers.l2()
 
 # training parameters
-LEARNING_RATE = 1e-4
-REGULARIZER_N = 1e-6
+LEARNING_RATE = 1e-3
+REGULARIZER_N = 1e-5
 # LAMBDA_LIPSCHITZ = 1e-3
 BATCH_SIZE = 128
 SHUFFLE_SIZE = 10000

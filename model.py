@@ -8,7 +8,8 @@ class Z_Norm_IntermediateLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         channel_size = input_shape[-1]
-        self.mean_lstd = tf.keras.layers.Dense(channel_size * 2, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
+        # self.mean_lstd = tf.keras.layers.Dense(channel_size * 2, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
+        self.mean_lstd = tf.keras.layers.Conv2D(channel_size * 2, 1, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, kernel_regularizer=KERNEL_REGULARIZER)
         self.channel_size = channel_size * 2
 
     def call(self, v1, v2, logdet=False, reverse=False):
@@ -47,7 +48,7 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         channel_size = input_shape[-1]
-        self.mean_lstd = self.add_weight("Mean, Logvar", (1, channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_ZERO, trainable=True)
+        self.mean_lstd = self.add_weight("Mean, Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_ZERO, trainable=True)
         self.channel_size = channel_size * 2
 
     def call(self, v1, logdet=False, reverse=False):
@@ -97,8 +98,6 @@ class InvConv1(tf.keras.layers.Layer):
         self.channel_size = channel_size
 
     def call(self, inputs, logdet=False, reverse=False):
-        return inputs[:,:,:,::-1], 0
-
         W = tf.reshape(tf.linalg.inv(self.W) if reverse else self.W, [1,1,self.channel_size,self.channel_size])
 
         x = tf.nn.conv2d(inputs, W, [1,1,1,1], padding="SAME")
@@ -212,13 +211,13 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
         # x += inputs  # residual
         # x = tf.keras.layers.BatchNormalization()(x)
 
-        s = tf.keras.layers.Conv2D(channel_size // 2, 4, activation="sigmoid", kernel_initializer=tf.keras.initializers.Constant(2.), padding="same")(x)
-        t = tf.keras.layers.Conv2D(channel_size // 2, 4, activation="sigmoid", kernel_initializer=tf.keras.initializers.Constant(-2.), padding="same")(x)
+        s = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
+        t = tf.keras.layers.Conv2D(channel_size // 2, 4, kernel_initializer=KERNEL_INITIALIZER_CLOSE_ZERO, padding="same")(x)
 
         # postprocess s & t
         # s = tf.nn.tanh(s + 1.)
-        # s = tf.nn.sigmoid(s)
-        # t = tf.nn.sigmoid(t)
+        s = tf.nn.sigmoid(s + 2.)
+        t = tf.nn.sigmoid(t - 2.)
 
         return tf.keras.Model(inputs, [s, t])
 
@@ -380,24 +379,22 @@ class GLOW(tf.keras.Model):
                 # Step 2.3 run the last K without concat
                 (ya, yb), logdet_fs = self.flowsteps[i_l][self.K - 1](x, logdet, reverse, training)
                 x = yb
-                # logpz with the mean and var accordingly
-                ya, yb = tf.reshape(ya, [ya.shape[0], -1]), tf.reshape(yb, [yb.shape[0], -1])
 
                 if i_l == self.L - 1:
                     x = concat_last_channel(ya, yb)
                     # logpz with the mean and var accordingly
                     ya, logpz = self.logpzlayers_last(x, logdet, reverse)
                     if logdet: logdet_fs_total += logdet_fs + logpz
-
-                    # Step 2.4 append to the z
-                    z.append(x)
                 else:
                     # logpz with the mean and var accordingly
                     ya, logpz = self.logpzlayers[i_l](ya, yb, logdet, reverse)
                     if logdet: logdet_fs_total += logdet_fs + logpz
 
-                    # Step 2.4 append to the z
-                    z.append(ya)
+                # logpz with the mean and var accordingly
+                ya = tf.reshape(ya, [ya.shape[0], -1])
+
+                # Step 2.4 append to the z
+                z.append(ya)
 
             z_total = tf.concat(z, axis=-1)
             if logdet:
@@ -423,17 +420,11 @@ class GLOW(tf.keras.Model):
 
                 if i_l == self.L - 1:
                     # reverse the renorm last k
-                    z, _ = self.logpzlayers_last(z, logdet, reverse)
-
-                    z1, z2 = split_last_channel(z)
-                    z1 = tf.reshape(z1, [-1, wh_size, wh_size, za_channel_size // 2])
-                    z2 = tf.reshape(z2, [-1, wh_size, wh_size, za_channel_size // 2])
-                    z = concat_last_channel(z1, z2)
+                    z, _ = self.logpzlayers_last(tf.reshape(z, [-1, wh_size, wh_size, za_channel_size]), logdet, reverse)
                 else:
                     # reverse the renorm last k
-                    z, _ = self.logpzlayers[i_l](z, tf.reshape(x, [-1, wh_size * wh_size * za_channel_size]), logdet, reverse)
+                    z, _ = self.logpzlayers[i_l](tf.reshape(z, [-1, wh_size, wh_size, za_channel_size]), x, logdet, reverse)
 
-                    z = tf.reshape(z, [-1, wh_size, wh_size, za_channel_size])
                     z = concat_last_channel(z, x)  # concat the z and previous x
 
                 # run the last K
@@ -457,21 +448,14 @@ class GLOW(tf.keras.Model):
 
         for i_l in reversed(range(self.L)):
             za_channel_size = self.channel_order[i_l]
-            wh_size = IMG_SIZE // 2**(i_l+1)
+            wh_size = self.img_size // 2**(i_l+1)
 
             if i_l == self.L - 1:
                 # reverse the renorm last k
                 z = self.logpzlayers_last.sample(temp)
-
-                z1, z2 = split_last_channel(z)
-                z1 = tf.reshape(z1, [1, wh_size, wh_size, za_channel_size // 2])
-                z2 = tf.reshape(z2, [1, wh_size, wh_size, za_channel_size // 2])
-                z = concat_last_channel(z1, z2)
             else:
                 # reverse the renorm last k
-                z = self.logpzlayers[i_l].sample(tf.reshape(x, [1, -1]), temp)
-
-                z = tf.reshape(z, [1, wh_size, wh_size, za_channel_size // 2])
+                z = self.logpzlayers[i_l].sample(x, temp)
                 z = concat_last_channel(z, x)  # concat the z and previous x
 
             # run the last K

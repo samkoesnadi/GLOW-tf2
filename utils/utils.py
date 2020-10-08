@@ -108,7 +108,7 @@ def logpz(mean, lstd, x):
     # return tf.reduce_sum(
     #     tf.reduce_mean(-0.5 * (tf.math.log(2 * np.pi) - tf.math.log(var**.5)) - .5 * (x - mean)**2 / var, 0)
     # )
-    return tf.reduce_sum(-0.5 * (np.log(2 * np.pi) + 2. * lstd + (x - mean) ** 2 / tf.exp(2. * lstd)), 1)
+    return tf.reduce_sum(-0.5 * (np.log(2 * np.pi) + 2. * lstd + (x - mean) ** 2 / tf.exp(2. * lstd)), (1,2,3))
 
     # var_matrix = tf.linalg.diag(var)
     # k = mean.shape[0]
