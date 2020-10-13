@@ -3,6 +3,13 @@ import datetime
 
 
 def squeeze2d(x, factor=2):
+    """
+    This function is adopted from https://github.com/openai/glow
+
+    :param x:
+    :param factor:
+    :return:
+    """
     assert factor >= 1
     if factor == 1:
         return x
@@ -20,6 +27,13 @@ def squeeze2d(x, factor=2):
 
 
 def unsqueeze2d(x, factor=2):
+    """
+    This function is adopted from https://github.com/openai/glow
+
+    :param x:
+    :param factor:
+    :return:
+    """
     assert factor >= 1
     if factor == 1:
         return x

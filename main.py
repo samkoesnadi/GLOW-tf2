@@ -2,8 +2,32 @@ from common_definitions import *
 from pipeline import *
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import argparse
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog="Glow: Generative Flow with Invertible 1x1 Convolutions", description="My implementation of GLOW from the paper https://arxiv.org/pdf/1807.03039 in Tensorflow 2")
+    parser.add_argument('--dataset', type=str, nargs='?', default=DATASET,
+                        help='The dataset to train on ("mnist", "cifar10", "cifar100")')
+    parser.add_argument('--k_glow', type=int, nargs='?', default=K_GLOW,
+                        help='The amount of blocks per layer')
+    parser.add_argument('--l_glow', type=int, nargs='?', default=L_GLOW,
+                        help='The amount of layers')
+    parser.add_argument('--img_size', type=int, nargs='?', default=IMG_SIZE,
+                        help='The width and height of the input images')
+    parser.add_argument('--channel_size', type=int, nargs='?', default=CHANNEL_SIZE,
+                        help='The channel size of the input images')
+
+
+    args = parser.parse_args()
+    K_GLOW = args.k_glow
+    L_GLOW = args.l_glow
+    IMG_SIZE = args.img_size
+    CHANNEL_SIZE = args.channel_size
+    DATASET = args.dataset
+
+    parser.print_help()  # print the help of the parser
+
     # Step 1. the data, split between train and test sets
     if DATASET == "mnist":
         dataset = tf.keras.datasets.mnist
@@ -32,17 +56,6 @@ if __name__ == "__main__":
         # horizontal_flip=True,
         shear_range=0.05)
 
-    # # convert class vectors to binary class matrices
-    # NUM_CLASSES = 10
-    # y_train = tf.keras.utils.to_categorical(y_train, NUM_CLASSES)
-    # y_test = tf.keras.utils.to_categorical(y_test, NUM_CLASSES)
-
-    # # filter to train
-    # x_train = x_train[y_train==3]
-    # y_train = y_train[y_train==3]
-    # x_test = x_test[y_test==3]
-    # y_test = y_test[y_test==3]
-
     def random_transform(x):
         x = datagen.random_transform(x)
         x = (ALPHA_BOUNDARY + (1 - ALPHA_BOUNDARY) * x / 255.)
@@ -59,9 +72,6 @@ if __name__ == "__main__":
 
     # Step 2. the brain
     brain = Brain(SQUEEZE_FACTOR, K_GLOW, L_GLOW, IMG_SIZE, CHANNEL_SIZE, LEARNING_RATE)
-
-    # # load weight if available
-    # print(brain.load_weights(CHECKPOINT_PATH))
 
     # Step 3. training iteration
 
