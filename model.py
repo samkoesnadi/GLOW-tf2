@@ -100,13 +100,16 @@ class InvConv1(tf.keras.layers.Layer):
         self.channel_size = channel_size
 
     def call(self, inputs, logdet=False, reverse=False):
-        # if tf.linalg.det(self.W) == 0:
-        #     W = self.W + KERNEL_INITIALIZER_CLOSE_VALUE(0)(
-        #         shape=self.W.shape)  # doing this will move the matrix to invertible location
-        # else:
-        #     W = self.W
+        if logdet:
+            if tf.linalg.det(self.W) == 0:
+                W = self.W + KERNEL_INITIALIZER_CLOSE_VALUE(0)(
+                    shape=self.W.shape)  # doing this will move the matrix to invertible location
+            else:
+                W = self.W
+        else:
+            W = self.W
 
-        W = tf.reshape(tf.linalg.inv(self.W) if reverse else self.W, [1,1,self.channel_size,self.channel_size])
+        W = tf.reshape(tf.linalg.inv(W) if reverse else W, [1,1,self.channel_size,self.channel_size])
 
         x = tf.nn.conv2d(inputs, W, [1,1,1,1], padding="SAME")
 
