@@ -49,7 +49,7 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         channel_size = input_shape[-1]
-        self.mean_lstd = self.add_weight("Mean, Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), trainable=True)
+        self.mean_lstd = self.add_weight("Mean_Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), trainable=True)
         self.channel_size = channel_size
         self.img_width = input_shape[1]
 
