@@ -386,7 +386,7 @@ class GLOW(tf.keras.Model):
                     if logdet: logdet_fs_total += logdet_fs + logpz
 
                 # logpz with the mean and var accordingly
-                ya = tf.reshape(ya, [ya.shape[0], -1])
+                ya = tf.compat.v1.layers.flatten(ya)
 
                 # Step 2.4 append to the z
                 z.append(ya)
