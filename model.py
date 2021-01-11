@@ -435,6 +435,7 @@ class GLOW(tf.keras.Model):
 
             return x, 0.
 
+    @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
     def sample(self, temp=1.):
         x = None
 
