@@ -14,9 +14,9 @@ if __name__ == "__main__":
     parser.add_argument('--l_glow', type=int, nargs='?', default=L_GLOW,
                         help='The amount of layers')
     parser.add_argument('--img_size', type=int, nargs='?', default=IMG_SIZE,
-                        help='The width and height of the input images')
+                        help='The width and height of the input images (this is dataset dependent)')
     parser.add_argument('--channel_size', type=int, nargs='?', default=CHANNEL_SIZE,
-                        help='The channel size of the input images')
+                        help='The channel size of the input images (this is dataset dependent)')
 
 
     args = parser.parse_args()

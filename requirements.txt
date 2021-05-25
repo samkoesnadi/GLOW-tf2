@@ -1,3 +1,4 @@
 tensorflow-gpu
 tqdm
 matplotlib
+scipy
