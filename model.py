@@ -34,7 +34,7 @@ class Z_Norm_IntermediateLayer(tf.keras.layers.Layer):
             return output, tf.reduce_mean(logpz(mean, lstd, v1), 0)
             # return output, tf.reduce_mean(tf.math.reciprocal_no_nan(std), 0)
         else:
-            return output, None
+            return output, 0.
 
     def sample(self, v2, temp=1.):
         mean_lstd = self.mean_lstd(v2)
@@ -49,7 +49,7 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         channel_size = input_shape[-1]
-        self.mean_lstd = self.add_weight("Mean, Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), trainable=True)
+        self.mean_lstd = self.add_weight("Mean_Logvar", (1, input_shape[1], input_shape[2], channel_size * 2,), initializer=KERNEL_INITIALIZER_CLOSE_VALUE(0), trainable=True)
         self.channel_size = channel_size
         self.img_width = input_shape[1]
 
@@ -74,7 +74,7 @@ class Z_Norm_LastLayer(tf.keras.layers.Layer):
             return output, tf.reduce_mean(logpz(mean, lstd, v1), 0)
             # return output, tf.reduce_mean(tf.math.reciprocal_no_nan(std), 0)
         else:
-            return output, None
+            return output, 0.
 
     def sample(self, temp=1.):
         mean_lstd = self.mean_lstd
@@ -116,7 +116,7 @@ class InvConv1(tf.keras.layers.Layer):
         if logdet:
             return x, inputs.shape[1] * inputs.shape[2] * tf.squeeze(tf.math.log(tf.math.abs(tf.linalg.det(W)) + TF_EPS))
         else:
-            return x, None
+            return x, 0.
 
 
 class BatchNormalization(tf.keras.layers.Layer):
@@ -155,7 +155,7 @@ class BatchNormalization(tf.keras.layers.Layer):
             gamma = self.bn.gamma
             return x, inputs.shape[1] * inputs.shape[2] * tf.reduce_sum(log_abs(gamma * (variance + epsilon) ** (-.5)))
         else:
-            return x, None
+            return x, 0.
 
 
 class ActNormalization(tf.keras.layers.Layer):
@@ -191,7 +191,7 @@ class ActNormalization(tf.keras.layers.Layer):
             if self.output_only_one:
                 return x
             else:
-                return x, None
+                return x, 0.
 
 
 class AffineCouplingLayer(tf.keras.layers.Layer):
@@ -250,7 +250,7 @@ class AffineCouplingLayer(tf.keras.layers.Layer):
             _logabsdet = tf.reduce_mean(tf.reduce_sum(log_abs(s2), [1,2,3]), 0)
             return (v1, v2), _logabsdet
         else:
-            return (v1, v2), None
+            return (v1, v2), 0.
 
 
 class FlowStep(tf.keras.layers.Layer):
@@ -285,7 +285,7 @@ class FlowStep(tf.keras.layers.Layer):
             # print(logdet_an, logdet_perm, logdet_acl)
             return x, logdet_an + logdet_perm + logdet_acl
         else:
-            return x, None
+            return x, 0.
 
 
 class CropIfNotFitLayer(tf.keras.layers.Layer):
@@ -386,7 +386,7 @@ class GLOW(tf.keras.Model):
                     if logdet: logdet_fs_total += logdet_fs + logpz
 
                 # logpz with the mean and var accordingly
-                ya = tf.reshape(ya, [ya.shape[0], -1])
+                ya = tf.compat.v1.layers.flatten(ya)
 
                 # Step 2.4 append to the z
                 z.append(ya)
@@ -395,7 +395,7 @@ class GLOW(tf.keras.Model):
             if logdet:
                 return z_total, tf.squeeze(logdet_fs_total / tf.math.log(2.))  # divide by all pixel... this is now in bits/dim
             else:
-                return z_total, None
+                return z_total, 0.
         else:
             assert not logdet  # inv cant have logdet
             z_total = inputs
@@ -433,8 +433,9 @@ class GLOW(tf.keras.Model):
                 # unsqueeze
                 x = self.squeezelayers[i_l](x, reverse, self.img_size // 2 ** i_l)
 
-            return x, None
+            return x, 0.
 
+    @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
     def sample(self, temp=1.):
         x = None
 

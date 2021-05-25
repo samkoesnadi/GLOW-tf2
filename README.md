@@ -74,6 +74,7 @@ optional arguments:
 ```
 
 ## Future improvements
+- [ ] Clean project and set up proper CI (prioritized)
 - [ ] Improve documentation
 - [ ] Analyze instability of the network's training that occurs (Matrix Invertible when backpropagating to update weights)
 
